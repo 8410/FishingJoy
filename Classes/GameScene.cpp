@@ -1,49 +1,156 @@
 #include "GameScene.h"
 
-
 GameScene::GameScene()
 {
 }
 
+bool GameScene::init()
+{
+	do
+	{
+		CC_BREAK_IF(!CCScene::init());
+		preloadResources();
+		//å› ä¸º~GameScene()ä¸­éœ€è¦CC_SAFE_RELEASE(_menuLayer)ï¼Œ å¦‚æžœå…¶å®ƒå±‚åˆ›å»ºå¤±è´¥ï¼Œ_menuLayerå°†ä¸åˆ›å»ºï¼Œ
+		//æ‰€ä»¥_menuLayerè¦å…ˆäºŽå…¶ä»–å±‚åˆ›å»ºï¼Œ å¦åˆ™å°†æŠ¥ "reference count greater than 0" é”™è¯¯
+		_menuLayer = MenuLayer::create(); 
+		CC_BREAK_IF(!_menuLayer);
+		CC_SAFE_RETAIN(_menuLayer); 
+		_backgroundLayer = BackgroundLayer::create();
+		CC_BREAK_IF(!_backgroundLayer);
+		this->addChild(_backgroundLayer);
+		_fishLayer = FishLayer::create();
+		CC_BREAK_IF(!_fishLayer);
+		this->addChild(_fishLayer);
+		_cannonLayer = CannonLayer::create();
+		CC_BREAK_IF(!_cannonLayer);
+		this->addChild(_cannonLayer);
+		_touchLayer = TouchLayer::create();
+		CC_BREAK_IF(!_touchLayer);
+		this->addChild(_touchLayer);
+		this->scheduleUpdate();
+		return true;
+	} while (0);
+	return false;
+}
+
+void GameScene::preloadResources(void)
+{
+	CCSpriteFrameCache* spriteFrameCache = CCSpriteFrameCache::sharedSpriteFrameCache();
+	//ä¿®æ”¹ä»¥ä¸‹plistæ–‡ä»¶ï¼Œ åˆ é™¤keyä¸­çš„ä¸­æ–‡ï¼Œ å¦åˆ™spriteFrameByNameå‡½æ•°æ— æ³•æ‰¾åˆ°Frameï¼Œå°†è¿”å›žNULL
+	spriteFrameCache->addSpriteFramesWithFile("FishActor-Large-ipadhd.plist");		//ä¿®æ”¹metadata->realTextureFileName->FishActor-Large-ipadhdhd.png, textureFileName->FishActor-Large-ipadhd.png
+	spriteFrameCache->addSpriteFramesWithFile("FishActor-Marlin-ipadhd.plist");		//ä¿®æ”¹metadata->realTextureFileName->FishActor-Marlin-ipadhdhd.png, textureFileName->FishActor-Marlin-ipadhd.png
+	spriteFrameCache->addSpriteFramesWithFile("FishActor-Shark-ipadhd.plist");		//åŒä¸Š
+	spriteFrameCache->addSpriteFramesWithFile("FishActor-Small-ipadhd.plist");		//åŒä¸Š
+	spriteFrameCache->addSpriteFramesWithFile("FishActor-Mid-ipadhd.plist");			//åŒä¸Š
+	spriteFrameCache->addSpriteFramesWithFile("cannon-ipadhd.plist");
+	spriteFrameCache->addSpriteFramesWithFile("Item-chaojiwuqi-ipadhd.plist");
+
+	CCTextureCache *textureCache = CCTextureCache::sharedTextureCache();
+	textureCache->addImage("ui_button_63-ipadhd.png");
+	textureCache->addImage("ui_button_65-ipadhd.png");
+
+	char str[][50] = { "SmallFish", "Croaker", "AngelFish", "Amphiprion", "PufferS", 
+		"Bream", "Porgy", "Chelonian", "Lantern", "Ray", "Shark", "GoldenTrout", "GShark", 
+		"GMarlinsFish", "GrouperFish", "JadePerch", "MarlinsFish", "PufferB" };
+	for (int i = 0; i < 18; i++)
+	{
+		CCArray* array = CCArray::createWithCapacity(10);
+		for (int j = 0; j < 10; j++)
+		{
+			CCString* spriteFrameName = CCString::createWithFormat("%s_actor_%03d.png", str[i], j + 1);
+			CCSpriteFrame* spriteFrame = spriteFrameCache->spriteFrameByName(spriteFrameName->getCString());
+			CC_BREAK_IF(!spriteFrame);
+			array->addObject(spriteFrame);
+		}
+		if (array->count() == 0)
+		{
+			continue;
+		}
+		CCAnimation* animation = CCAnimation::createWithSpriteFrames(array, 0.15f);
+		CCString* animationName = CCString::createWithFormat("fish_animation_%02d", i + 1);
+		CCAnimationCache::sharedAnimationCache()->addAnimation(animation, animationName->getCString());
+	}
+	
+}
 
 GameScene::~GameScene()
 {
+	CC_SAFE_RELEASE(_menuLayer);
 }
-bool GameScene::init()
-{
-	/*do  {...}while(0)±¾ÉíÃ»ÓÐÊµ¼ÊÒâÒå£¬µ«ÓÐºÜ¶àºÃ´¦£º
-	1¡¢¸¨Öú¶¨Òå¸´ÔÓµÄºê£¬±ÜÃâÒýÓÃÊ±³ö´í£¨ÔÚÒýÓÃºêÊ±Ö»ÊÇµ¥µ¥¼Ó{}»°ÓÐ¿ÉÄÜ»á±àÒë²»¹ý£©
-	2¡¢±ÜÃâÊ¹ÓÃgoto¶Ô³ÌÐòÁ÷½øÐÐÍ³Ò»µÄ¿ØÖÆ£¬£¨goto ±êÇ©£º£©ÔËÐÐµ½gotoÊ±»áÌø¹ýÖÐ¼äµÄ²Ù×÷
-		µ½±êÇ©£ººóµÄ²Ù×÷£¬½øÐÐÌø¹ýÒ»Ð©³ÌÐò£»µ«goto²»·ûºÏÈí¼þ¹¤³Ì½á¹¹¾¡Á¿²»ÓÃ£¬do{..}while(0)
-		Í¨¹ýbreak¿ÉÒÔÌø³ö£¬ÊµÏÖ¡£
-	3¡¢±ÜÃâ¿ÕºêÒýÆðµÄwarning
-		ÄÚºËÖÐÓÉÓÚ²»Í¬¼Ü¹¹µÄÏÞÖÆ£¬ºÜ¶àÊ±ºò»áÓÃµ½¿Õºê£¬ÔÚ±àÒëµÄÊ±ºò£¬¿Õºê»á¸ø³öwarning£¬ÎªÁË±ÜÃâ
-		ÕâÑùµÄwarning£¬¾Í¿ÉÒÔÊ¹ÓÃdo{}while(0)À´¶¨Òå¿Õºê
-	4¡¢¶¨ÒåÒ»¸öµ¥¶ÀµÄº¯Êý¿éÀ´ÊµÏÖ¸´ÔÓµÄ²Ù×÷£º
-		µ±ÄãµÄ¹¦ÄÜºÜ¸´ÔÓ£¬±äÁ¿ºÜ¶àÄãÓÖ²»Ô¸ÒâÔö¼ÓÒ»¸öº¯ÊýµÄÊ±ºò£¬Ê¹ÓÃdo{}while(0);£¬½«ÄãµÄ´úÂë
-		Ð´ÔÚÀïÃæ£¬ÀïÃæ¿ÉÒÔ¶¨Òå±äÁ¿¶ø²»ÓÃ¿¼ÂÇ±äÁ¿Ãû»áÍ¬º¯ÊýÖ®Ç°»òÕßÖ®ºóµÄÖØ¸´¡£
-	*/
-	do
-	{
-		if (!Scene::init())
-		{
-			break;
-		}
-		/*´´½¨±³¾°²ã*/
-		backgroundLayer = BackgroundLayer::create();
-		/*¼ì²éÊÇ·ñ´´½¨³É¹¦*/
-		CC_BREAK_IF(!backgroundLayer);
-		/*½«±³¾°²ãµ¼Èë³¡¾°*/
-		this->addChild(backgroundLayer);
-		/*´´½¨Óã²ã*/
-		fishLayer = FishLayer::create();
-		/*¼ì²éÓã²ãÊÇ·ñ´´½¨³É¹¦*/
-		CC_BREAK_IF(!fishLayer);
-		/*½«Óã²ãµ¼Èë³¡¾°*/
-		this->addChild(fishLayer);
-		return true;
 
+void GameScene::cannonAimAt(CCPoint target)
+{
+	_cannonLayer->aimAt(target);
+}
+
+void GameScene::cannonShootTo(CCPoint target)
+{
+	_cannonLayer->shootTo(target);
+}
+//é±¼å’Œå­å¼¹çš„ç¢°æ’ž
+bool GameScene::checkOutCollisionBetweenFishesAndBullet(Bullet* bullet)
+{
+	CCPoint bulletPos = bullet->getCollosionPoint();
+	CCArray* fishArray = _fishLayer->getFishArray();
+	CCObject* obj = NULL;
+	CCARRAY_FOREACH(fishArray, obj)
+	{
+		Fish* fish =(Fish*)obj;
+		if(fish->isRunning() && fish->getCollisionArea().containsPoint(bulletPos))
+		{
+			bullet->end();
+			return true;
+		}
 	}
-	while (0);
 	return false;
+}
+
+void GameScene::checkOutCollision()
+{
+	CCArray* bullets = _cannonLayer->getWeapon()->getBullets();
+	CCObject* obj = NULL;
+	CCARRAY_FOREACH(bullets, obj)
+	{
+		Bullet* bullet = (Bullet*)obj;
+		if(bullet->isVisible())
+		{
+			if(checkOutCollisionBetweenFishesAndBullet(bullet))
+			{
+				checkOutCollisionBetweenFishesAndFishingNet(bullet);
+			}
+		}
+	}	
+}
+
+void GameScene::update(float delta)
+{
+	checkOutCollision();
+}
+//é±¼è¢«æ•èŽ·çš„æ¦‚çŽ‡
+void GameScene::fishWillBeCaught(Fish* fish)
+{
+	float weaponPercents[k_Cannon_Count] = { 0.3, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1 };
+	float fishPercents[	k_Fish_Type_Count] = { 1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4 };
+	int cannonType = _cannonLayer->getWeapon()->getCannonType();
+	int fishType = fish->getType();
+	if(CCRANDOM_0_1() < 1.1)
+	{
+		fish->beCaught();
+	}
+}
+//é±¼å’Œæ¸”ç½‘çš„ç¢°æ’ž
+void GameScene::checkOutCollisionBetweenFishesAndFishingNet(Bullet* bullet)
+{
+	Weapon* weapon = _cannonLayer->getWeapon();
+	CCRect rect = weapon->getCollisionArea(bullet);
+	CCArray* fishArray = _fishLayer->getFishArray();
+	CCObject* obj = NULL;
+	CCARRAY_FOREACH(fishArray, obj)
+	{
+		Fish* fish = (Fish*)obj;
+		if(fish->isRunning() && rect.intersectsRect(fish->getCollisionArea()))
+		{
+			fishWillBeCaught(fish);
+		}
+	}
 }
